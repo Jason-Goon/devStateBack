@@ -10,9 +10,10 @@ const GameBoard = () => {
   const [hand, setHand] = useState([]);
   const [discardPileCards, setDiscardPileCards] = useState([]);
   const [playerTableCards, setPlayerTableCards] = useState([]);
-  // you might not need playerTableCards state here.
   const [selectedCardIndices, setSelectedCardIndices] = useState([]);
   const [playerTables, setPlayerTables] = useState([]);
+  const [selectedDiscardIndices, setSelectedDiscardIndices] = useState([]);
+
 
   useEffect(() => {
     // Listening for card deals and updates
@@ -38,6 +39,16 @@ const GameBoard = () => {
   }, []);
 
 
+  const handleSelectDiscardCard = (index) => {
+    setSelectedDiscardIndices(prevIndices => {
+      const isSelected = prevIndices.includes(index);
+      return isSelected ? prevIndices.filter(i => i !== index) : [...prevIndices, index];
+    });
+  };
+  
+
+
+
   // Function to handle drawing a card from the pack
   const drawCardFromPack = () => {
     socket.emit('drawCard');
@@ -51,14 +62,23 @@ const GameBoard = () => {
   };
 
   const placeCardsOnPlayerTable = () => {
-    const selectedCards = selectedCardIndices.map(index => hand[index]);
-    if (isValidPlay(selectedCards)) {
-      socket.emit('makePlay', selectedCards);
-      setSelectedCardIndices([]);
-    } else {
-      alert("Selected cards do not form a valid play.");
-    }
+    // Map indices to actual card objects from hand
+    const selectedHandCards = selectedCardIndices.map(index => hand[index]);
+  
+    // Prepare data structure for server indicating hand cards and discard pile selections
+    const playData = {
+      handCards: selectedHandCards,
+      discardIndex: selectedDiscardIndices.length > 0 ? selectedDiscardIndices[0] : null // Assuming only one discard pile card can be selected
+    };
+  
+    // Emitting the structured play data to the server
+    socket.emit('makePlay', playData);
+  
+    // Reset selections
+    setSelectedCardIndices([]);
+    setSelectedDiscardIndices([]);
   };
+  
 
   const placeCardOnDiscardPile = () => {
     if (selectedCardIndices.length === 1) {
@@ -82,17 +102,27 @@ const GameBoard = () => {
 
   return (
     <div className="gameBoard">
-      <PlayerInfoPanel playerTables={playerTables} /> {/* Use playerTables here */}
+      <PlayerInfoPanel playerTables={playerTables} />
   
-      <DiscardPile cards={discardPileCards} />
+      <DiscardPile
+        cards={discardPileCards}
+        onSelectCard={handleSelectDiscardCard}
+        selectedIndices={selectedDiscardIndices}
+      />
+
+  
       <PlayerTable cards={playerTableCards} />
+  
       <button onClick={drawCardFromPack}>Draw Card from Pack</button>
+  
       {selectedCardIndices.length > 0 && (
         <button onClick={placeCardsOnPlayerTable}>Place Selected Cards on Player Table</button>
       )}
+  
       {selectedCardIndices.length === 1 && (
         <button onClick={placeCardOnDiscardPile}>Discard Selected Card</button>
       )}
+  
       <Hand
         cards={hand}
         onSelectCard={handleSelectCard}
@@ -103,5 +133,8 @@ const GameBoard = () => {
   };
 
 export default GameBoard;
+
+
+
 
 
