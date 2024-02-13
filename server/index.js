@@ -183,10 +183,9 @@ io.on('connection', (socket) => {
   });
   
   
-  
-  socket.on('makePlay', ({ handCards, discardIndex }) => {
+  socket.on('makePlay', ({ handCards, discardIndices = [] }) => {
     const player = gameState.players.find(p => p.id === socket.id);
-    console.log(`Player ${socket.id} attempting to make a play with hand cards:`, handCards, `and discard pile index: ${discardIndex}`);
+    console.log(`Player ${socket.id} attempting to make a play with hand cards:`, handCards, `and discard pile indices:`, discardIndices);
 
     if (!player || !gameState.gameStarted) {
         console.log(`Play attempt failed: Game not started or player not found for socket ID ${socket.id}`);
@@ -194,12 +193,15 @@ io.on('connection', (socket) => {
         return;
     }
 
-    // Prepare an array to collect cards for validation
+    // Start with the selected hand cards
     let cardsToValidate = [...handCards];
-    if (typeof discardIndex === 'number' && discardIndex >= 0) {
-        const discardPileCard = gameState.discardPile[discardIndex];
-        cardsToValidate.push(discardPileCard);
-    }
+
+    // Add selected discard pile cards to the validation set
+    discardIndices.forEach(index => {
+        if (index >= 0 && index < gameState.discardPile.length) {
+            cardsToValidate.push(gameState.discardPile[index]);
+        }
+    });
 
     if (!isValidPlay(cardsToValidate)) {
         console.log(`Play attempt failed: Invalid play by player ${socket.id}`);
@@ -207,32 +209,29 @@ io.on('connection', (socket) => {
         return;
     }
 
-    // Filter valid hand cards for play
+    // Process valid hand cards
     const successfullyPlayedCards = handCards.filter(card => {
         const index = player.hand.findIndex(c => c.value === card.value && c.suit === card.suit);
-        return index !== -1;
+        return index !== -1 ? player.hand.splice(index, 1)[0] : null;
     });
 
-    // If a discard pile card was used, adjust the discard pile and player's hand accordingly
-    if (typeof discardIndex === 'number' && discardIndex >= 0) {
-        // Take all cards from the selected index upwards
-        const cardsToTake = gameState.discardPile.splice(discardIndex);
-
-        // Add the taken cards to the player's hand, excluding the first one (played card)
-        player.hand = player.hand.concat(cardsToTake.slice(1));
-
-        // Add only the played card to the play table
-        successfullyPlayedCards.push(cardsToTake[0]);
+    // Process discard pile cards
+    if (discardIndices.length > 0) {
+        // Sort indices in descending order to remove from the end
+        discardIndices.sort((a, b) => b - a).forEach(index => {
+            if (index >= 0 && index < gameState.discardPile.length) {
+                const [card] = gameState.discardPile.splice(index, 1);
+                successfullyPlayedCards.push(card);
+            }
+        });
     }
 
     console.log(`Successfully played cards for player ${socket.id}:`, successfullyPlayedCards);
 
     if (successfullyPlayedCards.length > 0) {
-        // Update the player's table with the successfully played card(s)
         gameState.playerTables[socket.id] = gameState.playerTables[socket.id] || [];
         gameState.playerTables[socket.id].push(...successfullyPlayedCards);
 
-        // Notify updates
         io.emit('updatePlayerTables', gameState.playerTables);
         io.to(socket.id).emit('updateHand', player.hand);
         io.emit('updateDiscardPile', gameState.discardPile);
@@ -244,6 +243,7 @@ io.on('connection', (socket) => {
         socket.emit('playError', 'No valid cards were played');
     }
 });
+  
 
   
 
