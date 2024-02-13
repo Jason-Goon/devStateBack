@@ -68,7 +68,8 @@ const GameBoard = () => {
     // Prepare data structure for server indicating hand cards and discard pile selections
     const playData = {
       handCards: selectedHandCards,
-      discardIndex: selectedDiscardIndices.length > 0 ? selectedDiscardIndices[0] : null // Assuming only one discard pile card can be selected
+      // Now allowing multiple selections from discard pile
+      discardIndices: selectedDiscardIndices
     };
   
     // Emitting the structured play data to the server
@@ -105,10 +106,11 @@ const GameBoard = () => {
       <PlayerInfoPanel playerTables={playerTables} />
   
       <DiscardPile
-        cards={discardPileCards}
-        onSelectCard={handleSelectDiscardCard}
-        selectedIndices={selectedDiscardIndices}
-      />
+       cards={discardPileCards}
+       onSelectCard={handleSelectDiscardCard}
+       selectedIndices={selectedDiscardIndices}
+       allowMultiSelect={true} // Ensure DiscardPile component supports this prop
+     />
 
   
       <PlayerTable cards={playerTableCards} />
@@ -133,6 +135,8 @@ const GameBoard = () => {
   };
 
 export default GameBoard;
+
+
 
 
 
