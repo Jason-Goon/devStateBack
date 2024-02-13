@@ -1,0 +1,91 @@
+const [hand, setHand] = useState([]);
+  const [discardPileCards, setDiscardPileCards] = useState([]);
+  const [playerTableCards, setPlayerTableCards] = useState([]);
+  const [selectedCardIndices, setSelectedCardIndices] = useState([]);
+  const [playerTables, setPlayerTables] = useState([]);
+  const [selectedDiscardIndices, setSelectedDiscardIndices] = useState([]);
+
+  useEffect(() => {
+    socket.on('dealCards', setHand);
+    socket.on('updateHand', setHand);
+    socket.on('updateDiscardPile', setDiscardPileCards);
+    socket.on('updatePlayerTable', setPlayerTableCards);
+    socket.on('updatePlayerTables', (updatedPlayerTables) => {
+      setPlayerTables(updatedPlayerTables);
+    });
+
+    return () => {
+      socket.off('dealCards');
+      socket.off('updateHand');
+      socket.off('updateDiscardPile');
+      socket.off('updatePlayerTable');
+      socket.off('updatePlayerTables');
+    };
+  }, []);
+
+  const handleSelectDiscardCard = (index) => {
+    setSelectedDiscardIndices(prevIndices => 
+      prevIndices.includes(index) ? [] : [index]
+    );
+  };
+
+  const handleSelectCard = (index) => {
+    setSelectedCardIndices(prevIndices => 
+      prevIndices.includes(index) ? prevIndices.filter(i => i !== index) : [...prevIndices, index]
+    );
+  };
+
+  const placeCardsOnPlayerTable = () => {
+    const selectedHandCards = selectedCardIndices.map(index => hand[index]);
+    const playData = {
+      handCards: selectedHandCards,
+      discardIndex: selectedDiscardIndices[0] // Assuming at most one discard pile card can be selected
+    };
+
+    socket.emit('makePlay', playData);
+
+    // Reset selections after submitting the play
+    setSelectedCardIndices([]);
+    setSelectedDiscardIndices([]);
+  };
+
+  const placeCardOnDiscardPile = () => {
+    if (selectedCardIndices.length === 1) {
+      const selectedIndex = selectedCardIndices[0];
+      const cardToDiscard = hand[selectedIndex];
+      socket.emit('placeCardOnDiscardPile', cardToDiscard);
+      setSelectedCardIndices([]);
+    } else {
+      alert("Please select exactly one card to discard.");
+    }
+  };
+
+  const drawCardFromPack = () => {
+    socket.emit('drawCard');
+  };
+
+  // The rest of your GameBoard logic here...
+
+  return (
+    <div className="gameBoard">
+      <PlayerInfoPanel playerTables={playerTables} />
+      <DiscardPile
+        cards={discardPileCards}
+        onSelectCard={handleSelectDiscardCard}
+        selectedIndices={selectedDiscardIndices}
+        allowMultiSelect={true} // Adjust based on your game's rules
+      />
+      <PlayerTable cards={playerTableCards} />
+      <button onClick={drawCardFromPack}>Draw Card from Pack</button>
+      <button onClick={placeCardsOnPlayerTable}>Place Selected Cards on Player Table</button>
+      <button onClick={placeCardOnDiscardPile}>Discard Selected Card</button>
+      <Hand
+        cards={hand}
+        onSelectCard={handleSelectCard}
+        selectedCardIndices={selectedCardIndices}
+      />
+    </div>
+  );
+};
+
+export default GameBoard;
